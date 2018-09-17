@@ -1,3 +1,5 @@
 # Python cache
 rtt_pyutils/__pycache__
 
+# Project files
+rtt_pyutils/.idea
