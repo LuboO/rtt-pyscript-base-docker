@@ -1,0 +1,196 @@
+import os
+import sys
+
+from fabric2 import Config, Connection
+from paramiko import RSAKey
+from getpass import getpass
+from rtt_pyutils.Utilities import *
+
+
+class RemoteMachine:
+    AUTH_METHODS = {
+        "private_key":  "1",
+        "password":     "2",
+        "quit":         "Q"
+    }
+
+    def __init__(self, user, hostname, port, alias="", as_root=False):
+        self.user = user
+        self.hostname = hostname
+        self.port = port
+        self.exec_with_sudo = user != "root" and as_root
+        self.machine_human_id = f"{hostname}:{port}"
+        if alias != "":
+            self.machine_human_id = f"{alias} ({self.machine_human_id})"
+
+        print(f"\n=== Log into remote machine ===")
+        print(f"Host - {self.machine_human_id}")
+        print(f"User - {user}", end="")
+        if self.exec_with_sudo:
+            print(" (The user must be sudoer!)")
+        else:
+            print()
+
+        print("Authentication methods: 1. Private key, 2. Password, Q. Quit")
+        first_loop = True
+
+        while True:
+            if first_loop:
+                first_loop = False
+            else:
+                print("Try again.")
+
+            auth_method = input("\nChoose authentication method. [1/2/Q] ")
+
+            # Find out authentication method
+            if auth_method == self.AUTH_METHODS["private_key"]:
+                print("You will be logged in using private key.")
+                identity_file_path = input("Path to identity file (leave empty for ~/.ssh/id_rsa): ")
+                password = getpass("Identity file password (leave empty for none): ")
+                if len(identity_file_path) == 0:
+                    identity_file_path = os.path.abspath(os.path.expanduser("~/.ssh/id_rsa"))
+                if len(password) == 0:
+                    password = None
+
+                try:
+                    # Try to load the key
+                    # Retry whole process on failure
+                    RSAKey.from_private_key_file(identity_file_path, password)
+                except Exception as e:
+                    print(f"Error while loading private key: {e}")
+                    continue
+
+            elif auth_method == self.AUTH_METHODS["password"]:
+                print("You will be logged in using password.")
+                identity_file_path = None
+                password = getpass("Password: ")
+                if len(password) == 0:
+                    password = None
+
+            elif auth_method == self.AUTH_METHODS["quit"]:
+                # Abort the login process
+                if Utilities.prompt_confirmation("Are you sure you want to quit"):
+                    raise RuntimeError(f"Login to {self.machine_human_id} aborted.")
+                else:
+                    continue
+
+            else:
+                print("Unknown option! Choose 1, 2 or Q.")
+                continue
+
+            # Get sudo password if needed
+            if self.exec_with_sudo:
+                if auth_method != self.AUTH_METHODS["password"] \
+                        or Utilities.prompt_confirmation("Is the sudo password different from your login password"):
+                    sudo_pass = getpass('Sudo password (leave empty for none): ')
+                else:
+                    sudo_pass = password
+
+                connection_config = Config(overrides={'sudo': {'password': sudo_pass}})
+            else:
+                connection_config = None
+
+            # Attempt login, try again on failure
+            try:
+                self.connection = Connection(host=hostname, user=user, port=port, config=connection_config,
+                                             connect_kwargs={'look_for_keys': False, 'allow_agent': False,
+                                                             'password': password, 'key_filename': identity_file_path})
+                # Force open connection to detect authentication failure
+                self.connection.open()
+
+            except Exception as e:
+                print(f"Error while logging in: {e}")
+                continue
+
+            # Test sudo ability if needed, try again on failure
+            if self.exec_with_sudo:
+                try:
+                    result = self.connection.sudo("whoami", hide=True)
+                    # Sanity check, should never happen. Previous line raises exception on authentication failure
+                    if result.exited != 0 or result.stdout.strip() != "root":
+                        raise RuntimeError("\"sudo whoami\" didn't return 0 or didn't output \"root\"")
+                except Exception as e:
+                    self.connection.close()
+                    print(f"Error while attempting sudo: {e}")
+                    continue
+
+            print(f"=== Login to {self.machine_human_id} was successful! ===\n")
+            break
+
+    def exec_cmd(self, cmd, without_sudo=False, expected_exit_codes={0}, hide=True):
+        # hide=True - I don't want to print output to console
+        # Instead, caller will handle the output
+        try:
+            if self.exec_with_sudo and not without_sudo:
+                # To avoid problems with commands such as 'sudo echo hello > file.txt' resulting in permission denied
+                # All commands with sudo are called as 'sudo su -c "<command>"'
+                return self.connection.sudo(f"su -c \"{cmd}\"", hide=hide)
+            else:
+                return self.connection.run(cmd, hide=hide)
+        except Exception as e:
+            # Write report and throw exception only if the non-zero exit code was not anticipated by the caller
+            if e.result.exited not in expected_exit_codes:
+                print("=== Failed command execution report ===")
+                print(f"Machine: {self.machine_human_id}")
+                print(f"Command: {e.result.command}")
+                print(f"Exit code: {e.result.exited}")
+                print(f"Stderr: {e.result.stderr.strip()}")
+                print("=== End of report ===")
+                raise RuntimeError("Execution of command on remote machine failed.")
+            else:
+                return e.result
+
+    def file_exists(self, path, directory=False):
+        if directory:
+            param = "-d"
+        else:
+            param = "-f"
+        return self.exec_cmd(f"[ {param} \"{path}\" ] && printf 1 || printf 0").stdout == "1"
+
+    def remove_directory(self, path):
+        self.exec_cmd(f"rm -rf {path}")
+
+    def check_installed_docker(self):
+        try:
+            self.exec_cmd("docker -v", without_sudo=True)
+        except RuntimeError:
+            print("It seems that remote machine is missing Docker.")
+            print("It can be installed by running\n"
+                  "\"sudo apt install docker.io\"   (Ubuntu/Debian)\n"
+                  "\"yum install docker\"           (RedHat/CentOS)\n")
+            raise RuntimeError("Failed to run \"docker -v\".")
+
+    def docker_container_exists(self, name):
+        return self.exec_cmd(f"docker ps -a -q --filter \"name=^/{name}$\"").stdout != ""
+
+    def pull_docker_image(self, docker_image):
+        print(f"\nPulling image {docker_image}. This may take a few minutes...")
+        self.exec_cmd(f"docker pull {docker_image}", hide="stderr")
+
+    def remove_docker_image(self, docker_image):
+        self.exec_cmd(f"docker rmi -f {docker_image}")
+
+    def remove_docker_container(self, name, ignore_failure=False):
+        if ignore_failure:
+            expected_exit_codes = {0, 1}
+        else:
+            expected_exit_codes = {0}
+        self.exec_cmd(f"docker rm -f {name}", expected_exit_codes=expected_exit_codes)
+
+    def stop_docker_container(self, name):
+        if not self.docker_container_exists(name):
+            raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
+                               f"Cannot stop.")
+        self.exec_cmd(f"docker stop {name}")
+
+    def start_docker_container(self, name):
+        if not self.docker_container_exists(name):
+            raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
+                               f"Cannot start.")
+        self.exec_cmd(f"docker start {name}")
+
+    def restart_docker_container(self, name):
+        if not self.docker_container_exists(name):
+            raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
+                               f"Cannot restart.")
+        self.exec_cmd(f"docker restart {name}")
