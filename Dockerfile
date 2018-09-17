@@ -11,5 +11,3 @@ RUN apt update && \
 
 COPY rtt_pyutils /rtt_pyutils/
 
-
-
