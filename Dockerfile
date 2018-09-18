@@ -11,3 +11,7 @@ RUN apt update && \
 
 COPY rtt_pyutils /rtt_pyutils/
 
+ENV RTT_PYSCRIPT_LOGS_DIR /script_logs
+
+VOLUME ["$RTT_PYSCRIPT_LOGS_DIR"]
+
