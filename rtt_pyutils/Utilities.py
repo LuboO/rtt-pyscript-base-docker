@@ -5,6 +5,7 @@ import os
 from getpass import getpass
 from subprocess import call
 from multiprocessing import Process
+from rtt_pyutils.EnvVariableGetter import EnvVariableGetter
 
 import MySQLdb
 
@@ -18,17 +19,10 @@ class Utilities:
 
 
     @staticmethod
-    def get_rtt_pyscript_logs_dir():
-        try:
-            return os.environ["RTT_PYSCRIPT_LOGS_DIR"]
-        except KeyError:
-            return ""
-
-
-    @staticmethod
     def init_basic_logger(logger_name, log_file_path=None):
         if log_file_path is None:
-            log_file_path = os.path.join(Utilities.get_default_rtt_pyscript_logs_dir(), f"{logger_name}.log")
+            log_file_path = os.path.join(EnvVariableGetter.get_default_rtt_pyscript_logs_dir(),
+                                         f"{logger_name}.log")
 
         logger = logging.getLogger(logger_name)
         logger.setLevel(logging.DEBUG)
