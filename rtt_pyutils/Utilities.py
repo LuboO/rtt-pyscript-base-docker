@@ -19,12 +19,11 @@ class Utilities:
 
 
     @staticmethod
-    def init_basic_logger(logger_name, log_file_path=None):
+    def init_basic_logger(script_name, log_file_path=None):
         if log_file_path is None:
-            log_file_path = os.path.join(EnvVariableGetter.get_default_rtt_pyscript_logs_dir(),
-                                         f"{logger_name}.log")
+            log_file_path = Utilities.get_default_script_log_path(script_name)
 
-        logger = logging.getLogger(logger_name)
+        logger = logging.getLogger(script_name)
         logger.setLevel(logging.DEBUG)
 
         formatter = logging.Formatter("[%(asctime)s] %(levelname)s - %(message)s",
@@ -40,6 +39,23 @@ class Utilities:
 
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)
+
+        return logger
+
+
+    @staticmethod
+    def get_default_script_log_path(script_name):
+        return os.path.join(EnvVariableGetter.get_rtt_pyscript_logs_dir(), f"{script_name}.log")
+
+
+    @staticmethod
+    def get_default_script_config_path(script_name):
+        return os.path.join(EnvVariableGetter.get_rtt_pyscript_cnf_dir(), f"{script_name}.cnf")
+
+
+    @staticmethod
+    def get_script_name(script_filename):
+        return os.path.splitext(os.path.basename(script_filename))[0]
 
 
     @staticmethod
