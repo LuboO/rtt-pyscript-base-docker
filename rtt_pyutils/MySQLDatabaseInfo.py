@@ -1,7 +1,7 @@
 class MySQLDatabaseInfo:
-    def __init__(self, host, port, database, user, password):
+    def __init__(self, host, port, database, username, password):
         self.host = host
         self.port = int(port)
         self.database = database
-        self.user = user
+        self.username = user
         self.password = password

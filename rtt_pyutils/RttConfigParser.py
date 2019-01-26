@@ -3,10 +3,18 @@ from rtt_pyutils.MySQLDatabaseInfo import MySQLDatabaseInfo
 
 
 class RttConfigParser(ConfigParser):
-    def __init__(self, file):
+    def __init__(self, file=None, dictionary=None):
         super().__init__()
-        self.file = file
-        self.safe_read(file)
+        if file is not None:
+            self.file = file
+            self.safe_read(file)
+        elif dictionary is not None:
+            for section in dictionary.keys():
+                self.add_section(section)
+                for key in dictionary.get(section).keys():
+                    self.set(section, key, dictionary.get(section).get(key))
+        else:
+            raise RuntimeError("you must provide either filename or dictionary")
 
     def safe_get(self, section, option, required=True, default=None):
         self.check_has_section(section)
@@ -35,12 +43,10 @@ class RttConfigParser(ConfigParser):
             host = self.safe_get("MySQL-Database", "Host")
             port = self.safe_get("MySQL-Database", "Port")
             database = self.safe_get("MySQL-Database", "Database")
-            credentials_cnf = RttConfigParser(self.safe_get("MySQL-Database", "Credentials-file"))
+            username = self.safe_get("MySQL-Database", "Username")
+            password = self.safe_get("MySQL-Database", "Password")
 
-            user = credentials_cnf.safe_get("Credentials", "User")
-            password = credentials_cnf.safe_get("Credentials", "Password")
-
-            return MySQLDatabaseInfo(host=host, port=port, database=database, user=user, password=password)
+            return MySQLDatabaseInfo(host=host, port=port, database=database, username=username, password=password)
 
         except Exception as e:
             raise RuntimeError(f"config \"{self.file}\": can't read MySQL Database information: {e}")

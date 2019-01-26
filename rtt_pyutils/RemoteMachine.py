@@ -4,6 +4,7 @@ import sys
 from fabric2 import Config, Connection
 from paramiko import RSAKey
 from getpass import getpass
+from shlex import quote
 from rtt_pyutils.Utilities import *
 
 
@@ -117,14 +118,14 @@ class RemoteMachine:
             print(f"=== Login to {self.machine_human_id} was successful! ===\n")
             break
 
-    def exec_cmd(self, cmd, without_sudo=False, expected_exit_codes={0}, hide=True):
+    def exec_cmd(self, cmd, expected_exit_codes={0}, hide=True):
         # hide=True - I don't want to print output to console
         # Instead, caller will handle the output
         try:
-            if self.exec_with_sudo and not without_sudo:
-                # To avoid problems with commands such as 'sudo echo hello > file.txt' resulting in permission denied
+            if self.exec_with_sudo:
+                # To avoid fuckery with commands such as 'sudo echo hello > file.txt' resulting in permission denied
                 # All commands with sudo are called as 'sudo su -c "<command>"'
-                return self.connection.sudo(f"su -c \"{cmd}\"", hide=hide)
+                return self.connection.sudo(f"su -c {quote(cmd)}", hide=hide)
             else:
                 return self.connection.run(cmd, hide=hide)
         except Exception as e:
@@ -145,14 +146,27 @@ class RemoteMachine:
             param = "-d"
         else:
             param = "-f"
-        return self.exec_cmd(f"[ {param} \"{path}\" ] && printf 1 || printf 0").stdout == "1"
+        return self.exec_cmd(f"[ {param} {quote(path)} ] && printf 1 || printf 0").stdout == "1"
+
+    def create_directory(self, path, access="770"):
+        self.exec_cmd(f"mkdir -p {quote(path)}")
+        self.exec_cmd(f"chmod -R {quote(access)} {quote(path)}")
+
+    def upload_file(self, local_path, remote_path, access="660"):
+        self.exec_cmd("rm tmp_file", expected_exit_codes=[0, 1])
+        self.connection.put(local_path, "tmp_file")
+
+        if self.exec_with_sudo:
+            self.exec_cmd(f"chown root:root tmp_file")
+        self.exec_cmd(f"chmod {quote(access)} tmp_file")
+        self.exec_cmd(f"mv tmp_file {quote(remote_path)}")
 
     def remove_directory(self, path):
-        self.exec_cmd(f"rm -rf {path}")
+        self.exec_cmd(f"rm -rf {quote(path)}")
 
     def check_installed_docker(self):
         try:
-            self.exec_cmd("docker -v", without_sudo=True)
+            self.exec_cmd("docker -v")
         except RuntimeError:
             print("It seems that remote machine is missing Docker.")
             print("It can be installed by running\n"
@@ -161,36 +175,37 @@ class RemoteMachine:
             raise RuntimeError("Failed to run \"docker -v\".")
 
     def docker_container_exists(self, name):
-        return self.exec_cmd(f"docker ps -a -q --filter \"name=^/{name}$\"").stdout != ""
+        filter_string = f"name=^/{name}$"
+        return self.exec_cmd(f"docker ps -a -q --filter {quote(filter_string)}").stdout != ""
 
     def pull_docker_image(self, docker_image):
         print(f"\nPulling image {docker_image}. This may take a few minutes...")
-        self.exec_cmd(f"docker pull {docker_image}", hide="stderr")
+        self.exec_cmd(f"docker pull {quote(docker_image)}", hide="stderr")
 
     def remove_docker_image(self, docker_image):
-        self.exec_cmd(f"docker rmi -f {docker_image}")
+        self.exec_cmd(f"docker rmi -f {quote(docker_image)}")
 
     def remove_docker_container(self, name, ignore_failure=False):
         if ignore_failure:
             expected_exit_codes = {0, 1}
         else:
             expected_exit_codes = {0}
-        self.exec_cmd(f"docker rm -f {name}", expected_exit_codes=expected_exit_codes)
+        self.exec_cmd(f"docker rm -f {quote(name)}", expected_exit_codes=expected_exit_codes)
 
     def stop_docker_container(self, name):
         if not self.docker_container_exists(name):
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot stop.")
-        self.exec_cmd(f"docker stop {name}")
+        self.exec_cmd(f"docker stop {quote(name)}")
 
     def start_docker_container(self, name):
         if not self.docker_container_exists(name):
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot start.")
-        self.exec_cmd(f"docker start {name}")
+        self.exec_cmd(f"docker start {quote(name)}")
 
     def restart_docker_container(self, name):
         if not self.docker_container_exists(name):
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot restart.")
-        self.exec_cmd(f"docker restart {name}")
+        self.exec_cmd(f"docker restart {quote(name)}")

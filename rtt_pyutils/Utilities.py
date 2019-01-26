@@ -2,6 +2,8 @@ import logging
 import shlex
 import sys
 import os
+import string
+import random
 from getpass import getpass
 from subprocess import call
 from multiprocessing import Process
@@ -17,6 +19,14 @@ class Utilities:
             raise EnvironmentError("Executing command \'{}\', error code: {}"
                                    .format(command, rval))
 
+    @staticmethod
+    def generate_random_password(length=30):
+        special_chars = "!?@+^"
+        characters = string.ascii_letters + string.digits + special_chars
+        while True:
+            rval = "".join(random.SystemRandom().choice(characters) for _ in range(length))
+            if any(spec in rval for spec in special_chars):
+                return rval
 
     @staticmethod
     def init_basic_logger(script_name, log_file_path=None):
@@ -86,7 +96,7 @@ class Utilities:
         print("=========================== !!!WARNING!!! ============================")
         print()
         print(f"To be purged: {machine_info}")
-        if not prompt_confirmation("Are you ABSOLUTELY sure you want to continue"):
+        if not Utilities.prompt_confirmation("Are you ABSOLUTELY sure you want to continue"):
             print()
             return False
         phrase = input(f"Repeat phrase \"{verification_phrase}\" to confirm purge: ")
@@ -98,7 +108,7 @@ class Utilities:
     def create_mysql_database_connection(db_info):
         try:
             return MySQLdb.connect(host=db_info.host, port=db_info.port, db=db_info.database,
-                                   user=db_info.user, passwd=db_info.password)
+                                   user=db_info.username, passwd=db_info.password)
         except Exception as e:
             raise RuntimeError(f"creating MySQL database connection: {e}")
 
