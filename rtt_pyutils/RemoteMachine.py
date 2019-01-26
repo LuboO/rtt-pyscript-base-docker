@@ -179,7 +179,7 @@ class RemoteMachine:
         return self.exec_cmd(f"docker ps -a -q --filter {quote(filter_string)}").stdout != ""
 
     def pull_docker_image(self, docker_image):
-        print(f"\nPulling image {docker_image}. This may take a few minutes...")
+        print(f"\nPulling image {docker_image}. This might take a few minutes...")
         self.exec_cmd(f"docker pull {quote(docker_image)}", hide="stderr")
 
     def remove_docker_image(self, docker_image):

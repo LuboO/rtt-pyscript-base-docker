@@ -3,5 +3,5 @@ class MySQLDatabaseInfo:
         self.host = host
         self.port = int(port)
         self.database = database
-        self.username = user
+        self.username = username
         self.password = password
