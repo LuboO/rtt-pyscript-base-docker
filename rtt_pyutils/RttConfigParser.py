@@ -35,18 +35,3 @@ class RttConfigParser(ConfigParser):
     def check_has_section(self, section_name):
         if not self.has_section(section_name):
             raise RuntimeError(f"config \"{self.file}\": missing section: {section_name}")
-
-    def get_mysql_db_info(self):
-        self.check_has_section("MySQL-Database")
-
-        try:
-            host = self.safe_get("MySQL-Database", "Host")
-            port = self.safe_get("MySQL-Database", "Port")
-            database = self.safe_get("MySQL-Database", "Database")
-            username = self.safe_get("MySQL-Database", "Username")
-            password = self.safe_get("MySQL-Database", "Password")
-
-            return MySQLDatabaseInfo(host=host, port=port, database=database, username=username, password=password)
-
-        except Exception as e:
-            raise RuntimeError(f"config \"{self.file}\": can't read MySQL Database information: {e}")
