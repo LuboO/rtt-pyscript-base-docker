@@ -1,5 +1,4 @@
 from configparser import ConfigParser
-from rtt_pyutils.MySQLDatabaseInfo import MySQLDatabaseInfo
 
 
 class RttConfigParser(ConfigParser):

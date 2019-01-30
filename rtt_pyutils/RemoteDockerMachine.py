@@ -1,9 +1,7 @@
-import os
-import sys
+import json
 
 from fabric2 import Config, Connection
 from paramiko import RSAKey
-from getpass import getpass
 from shlex import quote
 from rtt_pyutils.Utilities import *
 
@@ -209,3 +207,17 @@ class RemoteDockerMachine:
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot restart.")
         self.exec_cmd(f"docker restart {quote(name)}")
+
+    def get_image_env_var(self, image, variable_name, required=True, default=None):
+        result = self.exec_cmd(f"docker inspect {quote(image)}")
+        image_info = json.loads(result.stdout)[0]
+
+        for env_variable in image_info['ContainerConfig']['Env']:
+            name, value = env_variable.split('=')
+            if name == variable_name:
+                return value
+
+        if required:
+            raise RuntimeError(f"Environment variable {variable_name} is not defined in image {image}.")
+
+        return default

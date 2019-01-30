@@ -4,12 +4,13 @@ import sys
 import os
 import string
 import random
+import MySQLdb
 from getpass import getpass
 from subprocess import call
 from multiprocessing import Process
-from rtt_pyutils.EnvVariableGetter import EnvVariableGetter
 
-import MySQLdb
+from rtt_pyutils.DockerImageEnvVarNames import PyscriptBaseDocker
+
 
 class Utilities:
     @staticmethod
@@ -55,12 +56,29 @@ class Utilities:
 
     @staticmethod
     def get_default_script_log_path(script_name):
-        return os.path.join(EnvVariableGetter.get_rtt_pyscript_logs_dir(), f"{script_name}.log")
+        return os.path.join(
+            Utilities.get_env_variable(PyscriptBaseDocker.LOGS_DIR),
+            f"{script_name}.log"
+        )
 
 
     @staticmethod
     def get_default_script_config_path(script_name):
-        return os.path.join(EnvVariableGetter.get_rtt_pyscript_cnf_dir(), f"{script_name}.cnf")
+        return os.path.join(
+            Utilities.get_env_variable(PyscriptBaseDocker.CONFIGS_DIR),
+            f"{script_name}.cnf"
+        )
+
+
+    @staticmethod
+    def get_env_variable(name, required=True, default=None):
+        try:
+            return os.environ[name]
+        except KeyError as ex:
+            if required:
+                raise ex
+            else:
+                return default
 
 
     @staticmethod
@@ -112,12 +130,6 @@ class Utilities:
         except Exception as e:
             raise RuntimeError(f"creating MySQL database connection: {e}")
 
-    @staticmethod
-    def call_process_function(logger, fnc):
-        try:
-            fnc()
-        except Exception as ex:
-            logger.error(f"executing process function: {ex}")
 
     @staticmethod
     def run_with_timeout(logger, fnc, timeout=60):
@@ -129,3 +141,11 @@ class Utilities:
         if fnc_process.is_alive():
             fnc_process.terminate()
             raise TimeoutError("Process timeouted and was terminated.")
+
+
+    @staticmethod
+    def call_process_function(logger, fnc):
+        try:
+            fnc()
+        except Exception as ex:
+            logger.error(f"executing process function: {ex}")
