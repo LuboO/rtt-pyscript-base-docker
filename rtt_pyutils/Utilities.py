@@ -14,6 +14,20 @@ from rtt_pyutils.DockerImageEnvVarNames import PyscriptBaseDocker
 
 class Utilities:
     @staticmethod
+    def join_ignore_abs(path, *directories):
+        for directory in directories:
+            path = os.path.join(path, Utilities.strip_leading_slash(directory))
+
+        return path
+
+    @staticmethod
+    def strip_leading_slash(path):
+        if len(path) > 0 and path[0] == '/':
+            path = path[1:]
+
+        return path
+
+    @staticmethod
     def exec_sys_call_check(command, stdin=None, stdout=None, acc_codes=[0]):
         rval = call(shlex.split(command), stdin=stdin, stdout=stdout)
         if rval not in acc_codes:
@@ -53,7 +67,6 @@ class Utilities:
 
         return logger
 
-
     @staticmethod
     def get_default_script_log_path(script_name):
         return os.path.join(
@@ -61,14 +74,12 @@ class Utilities:
             f"{script_name}.log"
         )
 
-
     @staticmethod
     def get_default_script_config_path(script_name):
         return os.path.join(
             Utilities.get_env_variable(PyscriptBaseDocker.CONFIGS_DIR),
             f"{script_name}.cnf"
         )
-
 
     @staticmethod
     def get_env_variable(name, required=True, default=None):
@@ -80,11 +91,9 @@ class Utilities:
             else:
                 return default
 
-
     @staticmethod
     def get_script_name(script_filename):
         return os.path.splitext(os.path.basename(script_filename))[0]
-
 
     @staticmethod
     def prompt_new_password():
@@ -96,12 +105,10 @@ class Utilities:
             else:
                 return pwd1
 
-
     @staticmethod
     def prompt_confirmation(message):
         confirm = input(f"{message}? [Y/n] ")
         return confirm == "Y"
-
 
     @staticmethod
     def prompt_purge_confirmation(machine_info, verification_phrase):
@@ -121,7 +128,6 @@ class Utilities:
         print()
         return phrase == verification_phrase
 
-
     @staticmethod
     def create_mysql_database_connection(db_info):
         try:
@@ -129,7 +135,6 @@ class Utilities:
                                    user=db_info.username, passwd=db_info.password)
         except Exception as e:
             raise RuntimeError(f"creating MySQL database connection: {e}")
-
 
     @staticmethod
     def run_with_timeout(logger, fnc, timeout=60):
@@ -141,7 +146,6 @@ class Utilities:
         if fnc_process.is_alive():
             fnc_process.terminate()
             raise TimeoutError("Process timeouted and was terminated.")
-
 
     @staticmethod
     def call_process_function(logger, fnc):

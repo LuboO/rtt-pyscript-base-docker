@@ -8,10 +8,8 @@ class RttConfigParser(ConfigParser):
             self.file = file
             self.safe_read(file)
         elif dictionary is not None:
-            for section in dictionary.keys():
-                self.add_section(section)
-                for key in dictionary.get(section).keys():
-                    self.set(section, key, dictionary.get(section).get(key))
+            self.file = "dictionary"
+            self.read_dict(dictionary)
         else:
             raise RuntimeError("you must provide either filename or dictionary")
 

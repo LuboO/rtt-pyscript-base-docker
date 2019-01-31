@@ -150,9 +150,9 @@ class RemoteDockerMachine:
         self.exec_cmd(f"mkdir -p {quote(path)}")
         self.exec_cmd(f"chmod -R {quote(access)} {quote(path)}")
 
-    def upload_file(self, local_path, remote_path, access="660"):
-        self.exec_cmd("rm tmp_file", expected_exit_codes=[0, 1])
-        self.connection.put(local_path, "tmp_file")
+    def upload_file(self, local_file, remote_path, access="660"):
+        self.exec_cmd("rm tmp_file", expected_exit_codes={0, 1})
+        self.connection.put(local_file, "tmp_file")
 
         if self.exec_with_sudo:
             self.exec_cmd(f"chown root:root tmp_file")
@@ -172,38 +172,38 @@ class RemoteDockerMachine:
                   "\"yum install docker\"           (RedHat/CentOS)\n")
             raise RuntimeError("Failed to run \"docker -v\".")
 
-    def docker_container_exists(self, name):
+    def container_exists(self, name):
         filter_string = f"name=^/{name}$"
         return self.exec_cmd(f"docker ps -a -q --filter {quote(filter_string)}").stdout != ""
 
-    def pull_docker_image(self, docker_image):
+    def pull_image(self, docker_image):
         print(f"\nPulling docker image {docker_image}. This might take a few minutes...")
         self.exec_cmd(f"docker pull {quote(docker_image)}", hide="stderr")
 
-    def remove_docker_image(self, docker_image):
+    def remove_image(self, docker_image):
         self.exec_cmd(f"docker rmi -f {quote(docker_image)}")
 
-    def remove_docker_container(self, name, ignore_failure=False):
+    def remove_container(self, name, ignore_failure=False):
         if ignore_failure:
             expected_exit_codes = {0, 1}
         else:
             expected_exit_codes = {0}
         self.exec_cmd(f"docker rm -f {quote(name)}", expected_exit_codes=expected_exit_codes)
 
-    def stop_docker_container(self, name):
-        if not self.docker_container_exists(name):
+    def stop_container(self, name):
+        if not self.container_exists(name):
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot stop.")
         self.exec_cmd(f"docker stop {quote(name)}")
 
-    def start_docker_container(self, name):
-        if not self.docker_container_exists(name):
+    def start_container(self, name):
+        if not self.container_exists(name):
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot start.")
         self.exec_cmd(f"docker start {quote(name)}")
 
-    def restart_docker_container(self, name):
-        if not self.docker_container_exists(name):
+    def restart_container(self, name):
+        if not self.container_exists(name):
             raise RuntimeError(f"Container {name} does not exists on {self.machine_human_id}. "
                                f"Cannot restart.")
         self.exec_cmd(f"docker restart {quote(name)}")
